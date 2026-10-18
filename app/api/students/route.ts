@@ -1,11 +1,10 @@
-
 import { NextResponse } from "next/server";
 import prisma from "@/app/lib/prisma";
 import { auth } from "@/app/auth";
 import { studentSchema } from "@/app/students/validation";
 
-// GET: ดึงข้อมูลนักศึกษาทั้งหมด
-export async function GET() {
+// GET: ดึงข้อมูลนักศึกษาทั้งหมด พร้อมรองรับ Search & Filter
+export async function GET(request: Request) {
   try {
     const session = await auth();
 
@@ -16,7 +15,46 @@ export async function GET() {
       );
     }
 
+    // 1. ดึง Query Parameters จาก URL
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get("search") || searchParams.get("query") || "";
+    const major = searchParams.get("major") || "";
+    const year = searchParams.get("year");
+
+    // 2. สร้างเงื่อนไขการค้นหา/กรอง (Where Clause)
+    const whereConditions: Record<string, any>[] = [];
+
+    // ค้นหาคำค้นจาก ชื่อ, รหัสนักศึกษา หรือ อีเมล
+    if (search.trim()) {
+      whereConditions.push({
+        OR: [
+          { name: { contains: search.trim() } },
+          { studentCode: { contains: search.trim() } },
+          { email: { contains: search.trim() } },
+        ],
+      });
+    }
+
+    // กรองตามสาขาวิชา (Major)
+    if (major.trim()) {
+      whereConditions.push({
+        major: { equals: major.trim() },
+      });
+    }
+
+    // กรองตามชั้นปี (Year)
+    if (year) {
+      const yearNumber = Number(year);
+      if (!isNaN(yearNumber)) {
+        whereConditions.push({
+          year: yearNumber,
+        });
+      }
+    }
+
+    // 3. ดึงข้อมูลจากฐานข้อมูล Prisma
     const students = await prisma.student.findMany({
+      where: whereConditions.length > 0 ? { AND: whereConditions } : {},
       orderBy: { id: "asc" },
     });
 
@@ -76,7 +114,7 @@ export async function POST(request: Request) {
       data: {
         studentCode: data.studentCode.trim(),
         name: data.name.trim(),
-        email: data.email.trim() || null,
+        email: data.email?.trim() || null,
         major: data.major.trim(),
         year: data.year,
       },
@@ -96,7 +134,7 @@ export async function POST(request: Request) {
       typeof error === "object" &&
       error !== null &&
       "code" in error &&
-      error.code === "P2002"
+      (error as { code: string }).code === "P2002"
     ) {
       return NextResponse.json(
         { message: "รหัสนักศึกษานี้มีอยู่ในระบบแล้ว" },
