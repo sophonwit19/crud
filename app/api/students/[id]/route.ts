@@ -9,6 +9,19 @@ type RouteContext = {
   }>;
 };
 
+// แปลง id จาก URL เป็นตัวเลข ถ้าไม่ใช่เลขจำนวนเต็มบวกจะได้ null
+function parseId(id: string): number | null {
+  return /^\d+$/.test(id) ? Number(id) : null;
+}
+
+// ข้อความตอบกลับเมื่อ id ไม่ถูกต้อง
+function invalidIdResponse() {
+  return NextResponse.json(
+    { message: "Student ID ไม่ถูกต้อง" },
+    { status: 400 }
+  );
+}
+
 // 1. GET: ดึงข้อมูลนักศึกษารายคนตาม ID
 export async function GET(
   request: Request,
@@ -25,9 +38,14 @@ export async function GET(
     }
 
     const { id } = await context.params;
+    const studentId = parseId(id);
+
+    if (studentId === null) {
+      return invalidIdResponse();
+    }
 
     const student = await prisma.student.findUnique({
-      where: { id: Number(id) }
+      where: { id: studentId }
     });
 
     if (!student) {
@@ -62,6 +80,12 @@ export async function PUT(
     }
 
     const { id } = await context.params;
+    const studentId = parseId(id);
+
+    if (studentId === null) {
+      return invalidIdResponse();
+    }
+
     const body = await request.json();
 
     // ตรวจสอบความถูกต้องด้วย Zod
@@ -78,7 +102,7 @@ export async function PUT(
     }
 
     const updatedStudent = await prisma.student.update({
-      where: { id: Number(id) },
+      where: { id: studentId },
       data: validationResult.data,
     });
 
@@ -110,9 +134,14 @@ export async function DELETE(
     }
 
     const { id } = await context.params;
+    const studentId = parseId(id);
+
+    if (studentId === null) {
+      return invalidIdResponse();
+    }
 
     await prisma.student.delete({
-      where: { id: Number(id) },
+      where: { id: studentId },
     });
 
     return NextResponse.json({

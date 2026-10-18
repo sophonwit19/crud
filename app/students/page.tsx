@@ -1,8 +1,39 @@
 import prisma from "@/app/lib/prisma";
 import DeleteButton from "./delete-button";
+import SearchForm from "./search-form";
 
-export default async function StudentsPage() {
+type StudentsPageProps = {
+    searchParams: Promise<{
+        search?: string;
+        major?: string;
+        status?: string;
+    }>;
+};
+
+export default async function StudentsPage({
+    searchParams,
+}: StudentsPageProps) {
+    const params = await searchParams;
+
+    const search = params.search?.trim() ?? "";
+    const major = params.major ?? "";
+    const status = params.status ?? "";
+
     const students = await prisma.student.findMany({
+        where: {
+            AND: [
+                search
+                    ? {
+                          OR: [
+                              { studentCode: { contains: search } },
+                              { name: { contains: search } },
+                          ],
+                      }
+                    : {},
+                major ? { major } : {},
+                status ? { status: status === "active" } : {},
+            ],
+        },
         orderBy: {
             id: "asc",
         },
@@ -20,6 +51,9 @@ export default async function StudentsPage() {
                     <strong>{students.length}</strong> คน
                 </p>
             </div>
+
+            <SearchForm search={search} major={major} status={status} />
+
             <a
                 href={`/students/create`}
                 className="inline-block rounded bg-blue-600 my-5 px-6 py-2.5 text-sm font-medium text-white shadow-md transition duration-150 ease-in-out hover:bg-blue-700 hover:shadow-lg focus:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -110,6 +144,17 @@ export default async function StudentsPage() {
                                 </td>
                             </tr>
                         ))}
+
+                        {students.length === 0 && (
+                            <tr>
+                                <td
+                                    colSpan={8}
+                                    className="px-4 py-8 text-center text-gray-500"
+                                >
+                                    ไม่พบข้อมูลนักศึกษา
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>

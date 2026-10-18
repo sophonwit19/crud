@@ -4,7 +4,6 @@ interface Blog {
 }
 
 export default async function Blogs() {
-
   await new Promise((resolve) =>
     setTimeout(resolve, 3000)
   );
